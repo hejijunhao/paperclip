@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { Router } from "express";
 import type { Db } from "@paperclipai/db";
 import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
@@ -64,6 +65,64 @@ export function healthRoutes(
       features: {
         companyDeletionEnabled: opts.companyDeletionEnabled,
       },
+    });
+  });
+
+  router.post("/bootstrap-rotate", async (_req, res) => {
+    if (!db || opts.deploymentMode !== "authenticated") {
+      res.status(404).json({ error: "Not available" });
+      return;
+    }
+
+    const roleCount = await db
+      .select({ count: count() })
+      .from(instanceUserRoles)
+      .where(sql`${instanceUserRoles.role} = 'instance_admin'`)
+      .then((rows) => Number(rows[0]?.count ?? 0));
+
+    if (roleCount > 0) {
+      res.status(403).json({ error: "Instance already has an admin. Bootstrap rotation is disabled." });
+      return;
+    }
+
+    const now = new Date();
+    await db
+      .update(invites)
+      .set({ revokedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(invites.inviteType, "bootstrap_ceo"),
+          isNull(invites.revokedAt),
+          isNull(invites.acceptedAt),
+          gt(invites.expiresAt, now),
+        ),
+      );
+
+    const token = `pcp_bootstrap_${randomBytes(24).toString("hex")}`;
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    await db
+      .insert(invites)
+      .values({
+        inviteType: "bootstrap_ceo",
+        tokenHash,
+        allowedJoinTypes: "human",
+        expiresAt,
+        invitedByUserId: "system",
+      });
+
+    const baseUrl = (
+      process.env.PAPERCLIP_PUBLIC_URL ??
+      process.env.PAPERCLIP_AUTH_PUBLIC_BASE_URL ??
+      process.env.BETTER_AUTH_URL ??
+      process.env.BETTER_AUTH_BASE_URL ??
+      `http://localhost:${process.env.PORT ?? 3100}`
+    ).replace(/\/+$/, "");
+
+    res.json({
+      inviteUrl: `${baseUrl}/invite/${token}`,
+      expiresAt: expiresAt.toISOString(),
     });
   });
 

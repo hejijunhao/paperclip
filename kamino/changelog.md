@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.2 — 2026-03-16
+
+### Bootstrap Invite from UI
+
+Added a self-service bootstrap flow so the first admin can claim the instance directly from the browser — no SSH or CLI access needed.
+
+- **New endpoint:** `POST /api/health/bootstrap-rotate` — generates (or rotates) a bootstrap CEO invite and returns the invite URL. Only available when no instance admin exists yet; returns `403` once an admin is set.
+- **Updated `BootstrapPendingPage`** — replaced the static "check your logs" message with a "Generate invite link" button. Clicking it calls the new endpoint and displays a clickable invite URL. The CLI command is still available in a collapsible `<details>` block.
+
+## 1.0.1 — 2026-03-16
+
+### Fly.io Stability Fix
+
+Resolved intermittent 503 errors caused by health check flapping under resource pressure.
+
+- **Health check interval:** 15s → 30s — reduces unnecessary probe frequency
+- **Health check timeout:** 5s → 10s — tolerates brief slowdowns without marking the instance as dead
+
+**Root cause:** Two issues combined — (1) the startup banner crashed the process with `EACCES` when reading `/paperclip/instances/default/.env` (permission mismatch on the volume), and (2) the 1GB shared-cpu machine couldn't consistently respond to `/api/health` within 5s. Fly's proxy marked the instance unhealthy and returned `503`.
+
+### Server Fix
+
+- Wrapped `.env` file read in `startup-banner.ts:resolveAgentJwtSecretStatus()` with try-catch so a permission error on the diagnostic banner doesn't crash the entire server
+
 ## 1.0.0 — 2026-03-16
 
 ### Fly.io Deployment

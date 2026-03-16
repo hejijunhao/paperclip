@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "@/lib/router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -40,18 +40,68 @@ import { useDialog } from "./context/DialogContext";
 import { loadLastInboxTab } from "./lib/inbox";
 
 function BootstrapPendingPage({ hasActiveInvite = false }: { hasActiveInvite?: boolean }) {
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generateInvite = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/health/bootstrap-rotate", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? `Failed (${res.status})`);
+      }
+      const data = await res.json() as { inviteUrl: string; expiresAt: string };
+      setInviteUrl(data.inviteUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate invite");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-xl py-10">
       <div className="rounded-lg border border-border bg-card p-6">
         <h1 className="text-xl font-semibold">Instance setup required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {hasActiveInvite
-            ? "No instance admin exists yet. A bootstrap invite is already active. Check your Paperclip startup logs for the first admin invite URL, or run this command to rotate it:"
-            : "No instance admin exists yet. Run this command in your Paperclip environment to generate the first admin invite URL:"}
+          No instance admin exists yet. Generate a bootstrap invite link to claim this instance.
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-md border border-border bg-muted/30 p-3 text-xs">
+
+        {inviteUrl ? (
+          <div className="mt-4 space-y-3">
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Invite link</p>
+              <a
+                href={inviteUrl}
+                className="break-all text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                {inviteUrl}
+              </a>
+            </div>
+            <Button size="sm" variant="outline" onClick={generateInvite} disabled={loading}>
+              {loading ? "Generating..." : "Rotate link"}
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <Button onClick={generateInvite} disabled={loading}>
+              {loading ? "Generating..." : "Generate invite link"}
+            </Button>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">Or use the CLI</summary>
+              <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-muted/30 p-3">
 {`pnpm paperclipai auth bootstrap-ceo`}
-        </pre>
+              </pre>
+            </details>
+          </div>
+        )}
       </div>
     </div>
   );
