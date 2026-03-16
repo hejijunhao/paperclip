@@ -1,5 +1,5 @@
 /// <reference path="./types/express.d.ts" />
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -258,6 +258,7 @@ export async function startServer(): Promise<StartedServer> {
     }
   
     const dataDir = resolve(config.embeddedPostgresDataDir);
+    mkdirSync(dataDir, { recursive: true });
     const configuredPort = config.embeddedPostgresPort;
     let port = configuredPort;
     const embeddedPostgresLogBuffer: string[] = [];

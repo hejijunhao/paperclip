@@ -1,0 +1,42 @@
+app = "paperclip"
+primary_region = "sin"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  HOST = "0.0.0.0"
+  PORT = "3100"
+  SERVE_UI = "true"
+  PAPERCLIP_HOME = "/paperclip"
+  PAPERCLIP_DEPLOYMENT_MODE = "authenticated"
+  PAPERCLIP_DEPLOYMENT_EXPOSURE = "public"
+  PAPERCLIP_MIGRATION_AUTO_APPLY = "true"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[http_service]
+  internal_port = 3100
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  grace_period = "60s"
+  interval = "15s"
+  method = "GET"
+  timeout = "5s"
+  path = "/api/health"
+
+[mounts]
+  source = "paperclip_data"
+  destination = "/paperclip"
